@@ -1085,17 +1085,12 @@ def get_stock_availability(item_code, warehouse):
 
 
 
-@frappe.whitelist()
-def get_member_item():
-    try:
-        item = frappe.get_doc("Item", "Member")
-        return {
-            "item_code": item.item_code,
-        }
-    except frappe.DoesNotExistError:
-        frappe.throw(_("Item with code 'Member' does not exist"))
-    
 
+@frappe.whitelist()
+def get_item_price_list():
+    item = frappe.get_all("Item Price", filters={"item_code": "MEMBERSHIP"}, fields=["price_list_rate", "uom"])
+    return item
+        
 
 @frappe.whitelist()
 def create_membership_card(valid_from, valid_upto, pos_profile_doc, description,customer, method="create"):
@@ -1900,3 +1895,4 @@ def get_sales_invoice_child_table(sales_invoice, sales_invoice_item):
         "Sales Invoice Item", {"parent": parent_doc.name, "name": sales_invoice_item}
     )
     return child_doc
+

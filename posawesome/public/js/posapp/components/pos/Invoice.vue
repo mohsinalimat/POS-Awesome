@@ -1097,6 +1097,7 @@ export default {
       evntBus.$emit("set_pos_coupons", []);
       this.posa_coupons = [];
       this.customer = this.pos_profile.customer;
+      this.custom_membership_card= this.membershipcard
       this.invoice_doc = "";
       this.return_doc = "";
       this.discount_amount = 0;
@@ -1126,7 +1127,7 @@ export default {
       if (!data.name && !data.is_return) {
         this.items = [];
         this.customer = this.pos_profile.customer;
-        this.membership_card = this.membershipcard
+        this.custom_membership_card= this.membershipcard
         this.invoice_doc = "";
         this.discount_amount = 0;
         this.additional_discount_percentage = 0;
@@ -1153,6 +1154,7 @@ export default {
           }
         });
         this.customer = data.customer;
+        this.membership_card= data.custom_membership_card
         this.posting_date = data.posting_date || frappe.datetime.nowdate();
         this.discount_amount = data.discount_amount;
         this.additional_discount_percentage =
@@ -1184,6 +1186,7 @@ export default {
       if (!data.name && !data.is_return) {
         this.items = [];
         this.customer = this.pos_profile.customer;
+        this.custom_membership_card=this.membershipcard;
         this.invoice_doc = "";
         this.discount_amount = 0;
         this.additional_discount_percentage = 0;
@@ -1235,7 +1238,7 @@ export default {
       }
       doc.doctype = "Sales Invoice";
       doc.is_pos = 1;
-      doc.membership_card = this.membershipcard;
+      doc.custom_membership_card = this.membershipcard;
       doc.ignore_pricing_rule = 1;
       doc.company = doc.company || this.pos_profile.company;
       doc.pos_profile = doc.pos_profile || this.pos_profile.name;
@@ -1753,9 +1756,8 @@ export default {
           item: {
             item_code: item.item_code,
             customer: this.customer,
-            
+            custom_membership_card: this.membershipcard,
             doctype: "Sales Invoice",
-            membership_card: this.membershipcard,
             name: "New Sales Invoice 1",
             company: this.pos_profile.company,
             conversion_rate: 1,
@@ -2870,6 +2872,7 @@ export default {
           company: this.pos_profile.company,
           pos_profile: this.pos_profile.name,
           customer: this.customer,
+
         },
         async: true,
         callback: function (r) {
@@ -2897,6 +2900,7 @@ export default {
     evntBus.$on("register_pos_profile", (data) => {
       this.pos_profile = data.pos_profile;
       this.customer = data.pos_profile.customer;
+      this.custom_membership_card=data.membershipcard
       this.pos_opening_shift = data.pos_opening_shift;
       this.stock_settings = data.stock_settings;
       this.float_precision =
@@ -2912,6 +2916,9 @@ export default {
     });
     evntBus.$on("update_customer", (customer) => {
       this.customer = customer;
+    });
+     evntBus.$on("update_membershipcard", (membershipcard) => {
+      this.membershipcard = membershipcard;
     });
     evntBus.$on("fetch_customer_details", () => {
       this.fetch_customer_details();
@@ -2990,9 +2997,12 @@ export default {
     customer() {
       this.close_payments();
       evntBus.$emit("set_customer", this.customer);
-      evntBus.$emit("set_membershipcard", this.membershipcard);
       this.fetch_customer_details();
       this.set_delivery_charges();
+    },
+    membershipcard() {
+      evntBus.$emit("set_membershipcard", this.membershipcard);
+      
     },
     customer_info() {
       evntBus.$emit("set_customer_info_to_edit", this.customer_info);
@@ -3040,3 +3050,4 @@ export default {
   pointer-events: none;
 }
 </style>
+

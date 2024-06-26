@@ -276,7 +276,28 @@ export default {
             evntBus.$emit('set_membershipcard', r.message.name);
 
             // Call add_item with static item details
-            this.add_item("MEMBERSHIP", 10, "Nos");
+           frappe.call({
+              method: "posawesome.posawesome.api.posapp.get_item_price_list",
+              args: { item_code: "MEMBERSHIP" },
+              callback: function (r) {
+                   if (r.message && Array.isArray(r.message) && r.message.length > 0) {
+                      let item_details = r.message[0]; // Access the first item in the list
+                     
+                      item = { item_name : "MEMBERSHIP",rate:item_details.price_list_rate,uom: item_details.uom};
+                      if (item.has_variants) {
+                        evntBus.$emit("open_variants_model", item, this.items);
+                      } else {
+                        if (!item.qty || item.qty === 1) {
+                          item.qty = Math.abs(this.qty);
+                          item.item_code="MEMBERSHIP"
+                        }
+                        evntBus.$emit("add_item", item);
+                        this.qty = 1;
+                        this.item_code = "MEMBERSHIP";
+                      }
+                  } 
+              }
+            });
 
             this.close_dialog();
           } else {
@@ -321,7 +342,7 @@ export default {
     }
 
     if (index === -1 || this.new_line) {
-      const item =  { item_name: "MEMBERSHIP", rate: 10,uom: "Nos" };
+     
       if (item.has_serial_no && item.to_set_serial_no) {
          item.serial_no_selected = [];
          item.serial_no_selected.push(item.to_set_serial_no);
@@ -464,3 +485,4 @@ export default {
   },
 };
 </script>
+

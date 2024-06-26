@@ -708,7 +708,7 @@ export default {
     loading: false,
     pos_profile: "",
     invoice_doc: "",
-    loyalty_amount: 0,
+    loyalty_amount: -0,
     is_credit_sale: 0,
     is_write_off_change: 0,
     date_menu: false,
