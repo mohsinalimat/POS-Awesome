@@ -8,10 +8,10 @@
       <v-card>
         <v-card-title>
           <span v-if="membershipcard_id" class="headline primary--text">{{
-            __('Update Customer')
+            __("Update Customer")
           }}</span>
           <span v-else class="headline primary--text">{{
-            __('Create Membership Card')
+            __("Create Membership Card")
           }}</span>
         </v-card-title>
         <v-card-text class="pa-0">
@@ -88,16 +88,52 @@
                   :disabled="readonly"
                 ></v-text-field>
               </v-col>
+              <v-col cols="12">
+                <v-autocomplete
+                  clearable
+                  dense
+                  auto-select-first
+                  color="primary"
+                  :label="frappe._('Membership Offer') + ' *'"
+                  v-model="membership_offer"
+                  :items="membership_offers"
+                  background-color="white"
+                  :no-data-text="__('Membership Offer not found')"
+                  hide-details
+                  required
+                >
+                </v-autocomplete>
+              </v-col>
+              <!-- <v-col cols="12">
+                <v-text-field
+                  dense
+                  color="primary"
+                  :label="frappe._('Discount Amount') + ' *'"
+                  background-color="white"
+                  hide-details
+                  v-model="discount_amt"
+                ></v-text-field>
+              </v-col>
+              <v-col cols="12">
+                <v-text-field
+                  dense
+                  color="primary"
+                  :label="frappe._('Discount Percentage') + ' *'"
+                  background-color="white"
+                  hide-details
+                  v-model="discount_per"
+                ></v-text-field>
+              </v-col> -->
             </v-row>
           </v-container>
         </v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="error" dark @click="close_dialog">{{
-            __('Close')
+            __("Close")
           }}</v-btn>
           <v-btn color="success" dark @click="submit_dialog">{{
-            __('Submit')
+            __("Submit")
           }}</v-btn>
         </v-card-actions>
       </v-card>
@@ -106,18 +142,22 @@
 </template>
 
 <script>
-import { evntBus } from '../../bus';
+import { evntBus } from "../../bus";
 
 export default {
   data() {
     return {
       membershipcardDialog: false,
-      pos_profile: '',
-      membershipcard_id: '',
-      valid_from: '',
-      valid_upto: '',
-      description:'',
-      customer: '',
+      pos_profile: "",
+      membershipcard_id: "",
+      valid_from: "",
+      valid_upto: "",
+      description: "",
+      discount_amt: "",
+      membership_offer: "",
+      membership_offers: [],
+      discount_per: "",
+      customer: "",
       customers: [],
       readonly: false,
       items: [], // Define and initialize the items array
@@ -128,15 +168,17 @@ export default {
     valid_from(newVal) {
       if (newVal) {
         const validFromDate = new Date(newVal);
-        const validUptoDate = new Date(validFromDate.setFullYear(validFromDate.getFullYear() + 2));
+        const validUptoDate = new Date(
+          validFromDate.setFullYear(validFromDate.getFullYear() + 2)
+        );
         this.valid_upto = validUptoDate.toISOString().substr(0, 10);
       } else {
-        this.valid_upto = '';
+        this.valid_upto = "";
       }
     },
   },
   methods: {
-        calc_item_price(item) {
+    calc_item_price(item) {
       if (!item.posa_offer_applied) {
         if (item.price_list_rate) {
           item.rate = item.price_list_rate;
@@ -157,7 +199,7 @@ export default {
         );
       }
     },
-     get_price_list() {
+    get_price_list() {
       let price_list = this.pos_profile.selling_price_list;
       if (this.customer_info && this.pos_profile) {
         const { customer_price_list, customer_group_price_list } =
@@ -194,20 +236,21 @@ export default {
         is_pos: 1,
         membership_card: this.membershipcard,
         ignore_pricing_rule: 1,
-        company: this.pos_profile.company || '',
-        pos_profile: this.pos_profile.name || '',
-        campaign: this.pos_profile.campaign || '',
-        currency: this.pos_profile.currency || '',
-        naming_series: this.pos_profile.naming_series || '',
-        customer: this.customer || '',
+        company: this.pos_profile.company || "",
+        pos_profile: this.pos_profile.name || "",
+        campaign: this.pos_profile.campaign || "",
+        currency: this.pos_profile.currency || "",
+        naming_series: this.pos_profile.naming_series || "",
+        customer: this.customer || "",
         items: this.items || [], // Assuming this is an array in your data
         total: this.subtotal || 0,
         discount_amount: this.discount_amount || 0,
-        additional_discount_percentage: this.additional_discount_percentage || 0,
+        additional_discount_percentage:
+          this.additional_discount_percentage || 0,
         payments: this.get_payments() || [], // Assuming this is a function returning an array
         taxes: [],
-        posting_date: this.posting_date || '',
-        warehouse: this.pos_profile.warehouse || '',
+        posting_date: this.posting_date || "",
+        warehouse: this.pos_profile.warehouse || "",
       };
 
       return doc;
@@ -218,9 +261,9 @@ export default {
       }
 
       frappe.call({
-        method: 'posawesome.posawesome.api.posapp.get_customer_names_list',
+        method: "posawesome.posawesome.api.posapp.get_customer_names_list",
         args: {
-          pos_profile: JSON.stringify(this.pos_profile)
+          pos_profile: JSON.stringify(this.pos_profile),
         },
         callback: (r) => {
           if (!r.exc) {
@@ -229,260 +272,309 @@ export default {
         },
       });
     },
+    getmembership_offer() {
+      if (this.membership_offers.length > 0) return;
+      const vm = this;
+      frappe.db
+        .get_list('Membership Offer', {
+          fields: ['name'],
+          filters: { disable: 0 },
+          order_by: 'name',
+        })
+        .then((data) => {
+          if (data.length > 0) {
+            data.forEach((el) => {
+              vm.membership_offers.push(el.name);
+            });
+          }
+        });
+    },
     close_dialog() {
       this.membershipcardDialog = false;
     },
     clear_customer() {
-      this.valid_from = '';
-      this.valid_upto = '';
-      this.customer = '';
+      this.valid_from = "";
+      this.valid_upto = "";
+      this.customer = "";
+      this.description = "";
+      this.discount_amt = "";
+      this.membership_offer = ""
     },
     submit_dialog() {
       if (!this.valid_from) {
-        evntBus.$emit('show_mesage', {
-          text: __('Valid from required.'),
-          color: 'error',
+        evntBus.$emit("show_mesage", {
+          text: __("Valid from required."),
+          color: "error",
         });
         return;
       }
       if (!this.customer) {
-        evntBus.$emit('show_mesage', {
-          text: __('Customer required.'),
-          color: 'error',
+        evntBus.$emit("show_mesage", {
+          text: __("Customer required."),
+          color: "error",
         });
         return;
       }
+      // if (!this.discount_amt) {
+      //   evntBus.$emit("show_mesage", {
+      //     text: __("Discount amount required."),
+      //     color: "error",
+      //   });
+      //   return;
+      // }
+      if (!this.membership_offer) {
+        evntBus.$emit("show_mesage", {
+          text: __("Membership Offer amount required."),
+          color: "error",
+        });
+        return;
+      }
+      // if (!this.discount_per) {
+      //   evntBus.$emit("show_mesage", {
+      //     text: __("Discount percentage required."),
+      //     color: "error",
+      //   });
+      //   return;
+      // }
       const args = {
         valid_from: this.valid_from,
         customer: this.customer,
         valid_upto: this.valid_upto,
         pos_profile_doc: this.pos_profile,
-        description:this.description
+        description: this.description,
+        // discount_amount: this.discount_amt,
+        membership_offer: this.membership_offer
       };
       frappe.call({
-        method: 'posawesome.posawesome.api.posapp.create_membership_card',
+        method: "posawesome.posawesome.api.posapp.create_membership_card",
         args: args,
         callback: (r) => {
           if (!r.exc && r.message.name) {
-            let text = __('Membership Card created successfully.');
-            evntBus.$emit('show_mesage', {
+            let text = __("Membership Card created successfully.");
+            evntBus.$emit("show_mesage", {
               text: text,
-              color: 'success',
+              color: "success",
             });
             args.name = r.message.name;
-            frappe.utils.play_sound('submit');
-            evntBus.$emit('add_member_to_list', args);
-            evntBus.$emit('add_customer_to_list_membership', args); // Ensure this event is emitted
-            evntBus.$emit('set_membershipcard', r.message.name);
+            frappe.utils.play_sound("submit");
+            evntBus.$emit("add_member_to_list", args);
+            evntBus.$emit("add_customer_to_list_membership", args); // Ensure this event is emitted
+            evntBus.$emit("set_membershipcard", r.message.name);
 
             // Call add_item with static item details
-           frappe.call({
+            frappe.call({
               method: "posawesome.posawesome.api.posapp.get_item_price_list",
               args: { item_code: "MEMBERSHIP" },
               callback: function (r) {
-                   if (r.message && Array.isArray(r.message) && r.message.length > 0) {
-                      let item_details = r.message[0]; // Access the first item in the list
-                     
-                      item = { item_name : "MEMBERSHIP",rate:item_details.price_list_rate,uom: item_details.uom};
-                      if (item.has_variants) {
-                        evntBus.$emit("open_variants_model", item, this.items);
-                      } else {
-                        if (!item.qty || item.qty === 1) {
-                          item.qty = Math.abs(this.qty);
-                          item.item_code="MEMBERSHIP"
-                        }
-                        evntBus.$emit("add_item", item);
-                        this.qty = 1;
-                        this.item_code = "MEMBERSHIP";
-                      }
-                  } 
-              }
+                if (
+                  r.message &&
+                  Array.isArray(r.message) &&
+                  r.message.length > 0
+                ) {
+                  let item_details = r.message[0]; // Access the first item in the list
+
+                  item = {
+                    item_name: "MEMBERSHIP",
+                    rate: item_details.price_list_rate,
+                    uom: item_details.uom,
+                  };
+                  if (item.has_variants) {
+                    evntBus.$emit("open_variants_model", item, this.items);
+                  } else {
+                    if (!item.qty || item.qty === 1) {
+                      item.qty = Math.abs(this.qty);
+                      item.item_code = "MEMBERSHIP";
+                    }
+                    evntBus.$emit("add_item", item);
+                    this.qty = 1;
+                    this.item_code = "MEMBERSHIP";
+                  }
+                }
+              },
             });
 
             this.close_dialog();
           } else {
-            frappe.utils.play_sound('error');
-            evntBus.$emit('show_mesage', {
-              text: __('Membership Card creation failed.'),
-              color: 'error',
+            frappe.utils.play_sound("error");
+            evntBus.$emit("show_mesage", {
+              text: __("Membership Card creation failed."),
+              color: "error",
             });
           }
         },
       });
       this.membershipcardDialog = false;
     },
-   add_item(item_name, rate, uom) {
-    const item = {
-      item_name: "MEMBERSHIP",
-      rate: rate,
-      uom: uom,
-      item_code: "MEMBERSHIP",
-      qty: 1,
-      stock_uom: uom,
-      has_serial_no: false,
-      has_batch_no: false,
-      posa_is_offer: false,
-      posa_is_replace: false,
-    };
+    add_item(item_name, rate, uom) {
+      const item = {
+        item_name: "MEMBERSHIP",
+        rate: rate,
+        uom: uom,
+        item_code: "MEMBERSHIP",
+        qty: 1,
+        stock_uom: uom,
+        has_serial_no: false,
+        has_batch_no: false,
+        posa_is_offer: false,
+        posa_is_replace: false,
+      };
 
-    // Check if items array is defined and initialized
-    if (!this.items) {
-      this.items = [];
-    }
+      // Check if items array is defined and initialized
+      if (!this.items) {
+        this.items = [];
+      }
 
-    let index = -1;
-    if (!this.new_line) {
-      index = this.items.findIndex(
-        (el) =>
-          el.item_code === item.item_code &&
-          el.uom === item.uom &&
-          !el.posa_is_offer &&
-          !el.posa_is_replace
-      );
-    }
+      let index = -1;
+      if (!this.new_line) {
+        index = this.items.findIndex(
+          (el) =>
+            el.item_code === item.item_code &&
+            el.uom === item.uom &&
+            !el.posa_is_offer &&
+            !el.posa_is_replace
+        );
+      }
 
-    if (index === -1 || this.new_line) {
-     
-      if (item.has_serial_no && item.to_set_serial_no) {
-         item.serial_no_selected = [];
-         item.serial_no_selected.push(item.to_set_serial_no);
-         item.to_set_serial_no = null;
-       }
-       if (item.has_batch_no && item.to_set_batch_no) {
-         item.batch_no = item.to_set_batch_no;
-         item.to_set_batch_no = null;
-         item.batch_no = null;
-         this.set_batch_qty(item, item.batch_no, false);
-       }
-      this.items.unshift(item);
-      const vm = this;
-      frappe.call({
-        method: "posawesome.posawesome.api.posapp.get_item_detail",
-        args: {
-          warehouse: this.pos_profile.warehouse,
-          doc: this.get_invoice_doc(),
-          price_list: this.pos_profile.price_list,
-          item: {
-            item_code: "MEMBERSHIP",
-            customer: this.customer,
-            
-            doctype: "Sales Invoice",
-            membership_card: this.membershipcard,
-            name: "New Sales Invoice 1",
-            company: this.pos_profile.company,
-            conversion_rate: 1,
-            qty: item.qty,
-            income_account:"Service - BV",
-            price_list_rate: item.price_list_rate,
-            child_docname: "New Sales Invoice Item 1",
-            cost_center: this.pos_profile.cost_center,
-            currency: this.pos_profile.currency,
-            // plc_conversion_rate: 1,
-            pos_profile: this.pos_profile.name,
-            uom: item.uom,
-            tax_category: "",
-            transaction_type: "selling",
-            update_stock: this.pos_profile.update_stock,
-            price_list: "Standard Selling",
-            has_batch_no: item.has_batch_no,
-            serial_no: item.serial_no,
-            batch_no: item.batch_no,
-            is_stock_item: item.is_stock_item,
+      if (index === -1 || this.new_line) {
+        if (item.has_serial_no && item.to_set_serial_no) {
+          item.serial_no_selected = [];
+          item.serial_no_selected.push(item.to_set_serial_no);
+          item.to_set_serial_no = null;
+        }
+        if (item.has_batch_no && item.to_set_batch_no) {
+          item.batch_no = item.to_set_batch_no;
+          item.to_set_batch_no = null;
+          item.batch_no = null;
+          this.set_batch_qty(item, item.batch_no, false);
+        }
+        this.items.unshift(item);
+        const vm = this;
+        frappe.call({
+          method: "posawesome.posawesome.api.posapp.get_item_detail",
+          args: {
+            warehouse: this.pos_profile.warehouse,
+            doc: this.get_invoice_doc(),
+            price_list: this.pos_profile.price_list,
+            item: {
+              item_code: "MEMBERSHIP",
+              customer: this.customer,
+
+              doctype: "Sales Invoice",
+              membership_card: this.membershipcard,
+              name: "New Sales Invoice 1",
+              company: this.pos_profile.company,
+              conversion_rate: 1,
+              qty: item.qty,
+              income_account: "Service - BV",
+              price_list_rate: item.price_list_rate,
+              child_docname: "New Sales Invoice Item 1",
+              cost_center: this.pos_profile.cost_center,
+              currency: this.pos_profile.currency,
+              // plc_conversion_rate: 1,
+              pos_profile: this.pos_profile.name,
+              uom: item.uom,
+              tax_category: "",
+              transaction_type: "selling",
+              update_stock: this.pos_profile.update_stock,
+              price_list: "Standard Selling",
+              has_batch_no: item.has_batch_no,
+              serial_no: item.serial_no,
+              batch_no: item.batch_no,
+              is_stock_item: item.is_stock_item,
+            },
           },
-        },
-        callback: function (r) {
-          if (r.message) {
-            const data = r.message;
-            if (data.batch_no_data) {
-              item.batch_no_data = data.batch_no_data;
-            }
-            if (
-              item.has_batch_no &&
-              vm.pos_profile.posa_auto_set_batch &&
-              !item.batch_no &&
-              data.batch_no_data
-            ) {
-              item.batch_no_data = data.batch_no_data;
-              vm.set_batch_qty(item, item.batch_no, false);
-            }
-            if (data.has_pricing_rule) {
-            } else if (
-              vm.pos_profile.posa_apply_customer_discount &&
-              vm.customer_info.posa_discount > 0 &&
-              vm.customer_info.posa_discount <= 100
-            ) {
+          callback: function (r) {
+            if (r.message) {
+              const data = r.message;
+              if (data.batch_no_data) {
+                item.batch_no_data = data.batch_no_data;
+              }
               if (
-                item.posa_is_offer == 0 &&
-                !item.posa_is_replace &&
-                item.posa_offer_applied == 0
+                item.has_batch_no &&
+                vm.pos_profile.posa_auto_set_batch &&
+                !item.batch_no &&
+                data.batch_no_data
               ) {
-                if (item.max_discount > 0) {
-                  item.discount_percentage =
-                    item.max_discount < vm.customer_info.posa_discount
-                      ? item.max_discount
-                      : vm.customer_info.posa_discount;
-                } else {
-                  item.discount_percentage = vm.customer_info.posa_discount;
+                item.batch_no_data = data.batch_no_data;
+                vm.set_batch_qty(item, item.batch_no, false);
+              }
+              if (data.has_pricing_rule) {
+              } else if (
+                vm.pos_profile.posa_apply_customer_discount &&
+                vm.customer_info.posa_discount > 0 &&
+                vm.customer_info.posa_discount <= 100
+              ) {
+                if (
+                  item.posa_is_offer == 0 &&
+                  !item.posa_is_replace &&
+                  item.posa_offer_applied == 0
+                ) {
+                  if (item.max_discount > 0) {
+                    item.discount_percentage =
+                      item.max_discount < vm.customer_info.posa_discount
+                        ? item.max_discount
+                        : vm.customer_info.posa_discount;
+                  } else {
+                    item.discount_percentage = vm.customer_info.posa_discount;
+                  }
                 }
               }
-            }
-            if (!item.batch_price) {
-              if (
-                !item.is_free_item &&
-                !item.posa_is_offer &&
-                !item.posa_is_replace
-              ) {
-                item.price_list_rate = data.price_list_rate;
+              if (!item.batch_price) {
+                if (
+                  !item.is_free_item &&
+                  !item.posa_is_offer &&
+                  !item.posa_is_replace
+                ) {
+                  item.price_list_rate = data.price_list_rate;
+                }
               }
+              item.last_purchase_rate = data.last_purchase_rate;
+              item.projected_qty = data.projected_qty;
+              item.reserved_qty = data.reserved_qty;
+              item.conversion_factor = data.conversion_factor;
+              item.stock_qty = data.stock_qty;
+              item.actual_qty = data.actual_qty;
+              item.stock_uom = data.stock_uom;
+              item.item_code = "MEMBERSHIP";
+
+              vm.calc_item_price(item);
             }
-            item.last_purchase_rate = data.last_purchase_rate;
-            item.projected_qty = data.projected_qty;
-            item.reserved_qty = data.reserved_qty;
-            item.conversion_factor = data.conversion_factor;
-            item.stock_qty = data.stock_qty;
-            item.actual_qty = data.actual_qty;
-            item.stock_uom = data.stock_uom;
-            item.item_code = "MEMBERSHIP";
-            
-            vm.calc_item_price(item);
-          }
-          
-          evntBus.$emit("add_item", item);
-          this.qty = 1;
-        },
-      });
-    } 
-    this.$forceUpdate();
+
+            evntBus.$emit("add_item", item);
+            this.qty = 1;
+          },
+        });
+      }
+      this.$forceUpdate();
+    },
   },
-  },
- 
+
   created() {
     this.fetchCustomers();
-    evntBus.$on('open_member', (data) => {
+    this.getmembership_offer();
+    evntBus.$on("open_member", (data) => {
       this.membershipcardDialog = true;
       if (data) {
         this.valid_from = data.valid_from;
         this.customer = data.customer;
         this.description = data.description;
         if (this.valid_from) {
-          this.$watch('valid_from')(this.valid_from);
+          this.$watch("valid_from")(this.valid_from);
         }
       }
     });
-    evntBus.$on('register_pos_profile', (data) => {
+    evntBus.$on("register_pos_profile", (data) => {
       this.pos_profile = data.pos_profile;
       this.fetchCustomers(); // Fetch customers when pos_profile is registered
     });
-    evntBus.$on('payments_register_pos_profile', (data) => {
+    evntBus.$on("payments_register_pos_profile", (data) => {
       this.pos_profile = data.pos_profile;
     });
-    evntBus.$on('add_customer_to_list_membership', (customer) => {
+    evntBus.$on("add_customer_to_list_membership", (customer) => {
       this.customers.push(customer);
     });
 
     // Add the event listener for adding items
-   
   },
 };
 </script>
-

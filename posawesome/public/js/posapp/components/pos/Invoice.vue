@@ -638,6 +638,48 @@
           <v-row no-gutters class="pa-1 pt-9 pr-1">
             <v-col cols="6" class="pa-1">
               <v-text-field
+                :value="formtFloat(membership_dis_per)"
+                :label="frappe._('Membership Discount Percentage(%)')"
+                outlined
+                dense
+                hide-details
+                suffix="%"
+                color="accent"
+                readonly
+                @change= "[
+                    setFormatedFloat(
+                      membership_dis_per,
+                      'membership_dis_per',
+                      null,
+                      false,
+                      $event
+                    ),
+                    ms_discount_per(),
+                  ]"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="6" class="pa-1">
+              <v-text-field
+                :value="formtFloat(membership_dis_amt)"
+                :label="frappe._('Membership Discount Amount')"
+                outlined
+                dense
+                hide-details
+                color="accent"
+                readonly
+                @change="
+                  setFormatedCurrency(
+                    membership_dis_amt,
+                    'membership_dis_amt',
+                    null,
+                    false,
+                    $event
+                  )
+                "
+              ></v-text-field>
+            </v-col>
+            <v-col cols="6" class="pa-1">
+              <v-text-field
                 :value="formtFloat(total_qty)"
                 :label="frappe._('Total Qty')"
                 outlined
@@ -852,6 +894,8 @@ export default {
       posOffers: [],
       posa_offers: [],
       posa_coupons: [],
+      membership_dis_per: '',
+      membership_dis_amt: '',
       allItems: [],
       discount_percentage_offer_name: null,
       invoiceTypes: ["Invoice", "Order"],
@@ -911,6 +955,7 @@ export default {
         sum += flt(item.qty) * flt(item.rate);
       });
       sum -= this.flt(this.discount_amount);
+      // sum -= this.flt(this.membership_dis_amt);
       sum += this.flt(this.delivery_charges_rate);
       return this.flt(sum, this.currency_precision);
     },
@@ -1097,7 +1142,9 @@ export default {
       evntBus.$emit("set_pos_coupons", []);
       this.posa_coupons = [];
       this.customer = this.pos_profile.customer;
-      this.custom_membership_card= this.membershipcard
+      this.custom_membership_card = this.membershipcard;
+      this.membership_dis_per = "";
+      this.membership_dis_amt = "";
       this.invoice_doc = "";
       this.return_doc = "";
       this.discount_amount = 0;
@@ -1127,7 +1174,9 @@ export default {
       if (!data.name && !data.is_return) {
         this.items = [];
         this.customer = this.pos_profile.customer;
-        this.custom_membership_card= this.membershipcard
+        this.custom_membership_card = this.membershipcard;
+        this.custom_membership_discount_percent = this.membership_dis_per
+        this.custom_membership_discount_amt = this.membership_dis_amt
         this.invoice_doc = "";
         this.discount_amount = 0;
         this.additional_discount_percentage = 0;
@@ -1154,7 +1203,7 @@ export default {
           }
         });
         this.customer = data.customer;
-        this.membership_card= data.custom_membership_card
+        this.membership_card = data.custom_membership_card;
         this.posting_date = data.posting_date || frappe.datetime.nowdate();
         this.discount_amount = data.discount_amount;
         this.additional_discount_percentage =
@@ -1186,7 +1235,7 @@ export default {
       if (!data.name && !data.is_return) {
         this.items = [];
         this.customer = this.pos_profile.customer;
-        this.custom_membership_card=this.membershipcard;
+        this.custom_membership_card = this.membershipcard;
         this.invoice_doc = "";
         this.discount_amount = 0;
         this.additional_discount_percentage = 0;
@@ -1239,6 +1288,8 @@ export default {
       doc.doctype = "Sales Invoice";
       doc.is_pos = 1;
       doc.custom_membership_card = this.membershipcard;
+      doc.custom_membership_discount_percent = this.membership_dis_per;
+      doc.custom_membership_discount_amt = this.membership_dis_amt;
       doc.ignore_pricing_rule = 1;
       doc.company = doc.company || this.pos_profile.company;
       doc.pos_profile = doc.pos_profile || this.pos_profile.name;
@@ -1408,7 +1459,7 @@ export default {
         method: "posawesome.posawesome.api.posapp.update_invoice",
         args: {
           data: doc,
-          membershipcard:vm.membershipcard
+          membershipcard: vm.membershipcard,
         },
         async: false,
         callback: function (r) {
@@ -1465,7 +1516,7 @@ export default {
         });
         return;
       }
-      
+
       if (!this.items.length) {
         evntBus.$emit("show_mesage", {
           text: __(`There is no Items !`),
@@ -1757,6 +1808,8 @@ export default {
             item_code: item.item_code,
             customer: this.customer,
             custom_membership_card: this.membershipcard,
+            custom_membership_discount_percent : this.membership_dis_per,
+            custom_membership_discount_amt : this.membership_dis_amt,
             doctype: "Sales Invoice",
             name: "New Sales Invoice 1",
             company: this.pos_profile.company,
@@ -1893,6 +1946,15 @@ export default {
       } else {
         this.additional_discount_percentage = 0;
         this.discount_amount = 0;
+      }
+    },
+    ms_discount_per(discount_per) {
+      let value = flt(this.membership_dis_per);
+      if (value >= -100 && value <= 100) {
+        this.membership_dis_amt = (this.Total * value) / 100;
+      } else {
+        this.membership_dis_per = 0;
+        this.membership_dis_amt = 0;
       }
     },
 
@@ -2742,6 +2804,9 @@ export default {
         offer.discount_percentage > 0 &&
         offer.discount_percentage <= 100
       ) {
+        if(this.membership_dis_per){
+          offer.discount_percentage += this.membership_dis_per
+        }
         this.discount_amount = this.flt(
           (flt(this.Total) * flt(offer.discount_percentage)) / 100,
           this.currency_precision
@@ -2756,6 +2821,12 @@ export default {
         this.discount_percentage_offer_name == offer.offer_name
       ) {
         this.discount_amount = 0;
+        if(this.membership_dis_per){
+          this.discount_amount = this.flt(
+            (flt(this.Total) * flt(this.membership_dis_per)) / 100,
+            this.currency_precision
+          );
+        }
         this.discount_percentage_offer_name = null;
       }
     },
@@ -2872,7 +2943,6 @@ export default {
           company: this.pos_profile.company,
           pos_profile: this.pos_profile.name,
           customer: this.customer,
-
         },
         async: true,
         callback: function (r) {
@@ -2894,13 +2964,65 @@ export default {
         this.delivery_charges_rate = 0;
       }
     },
+    check_and_set_membership_offers(data){
+      const vm = this
+      frappe.call({
+        method:
+          "posawesome.posawesome.api.posapp.check_and_set_membership_offers",
+        args: {
+          items: vm.items,
+          data: data,
+          customer: vm.customer,
+          posting_date: vm.posting_date || frappe.datetime.nowdate(),
+          total: vm.Total
+        },
+        callback: function (r) {
+          if (r.message) {
+            vm.membership_dis_amt = r.message;
+            this.updated_membership_dis_amt()
+          }
+        },
+      });
+    },
+    updated_membership_dis_amt() {
+      if (!this.membership_dis_amt || this.membership_dis_amt == 0) {
+        this.membership_dis_per = 0;
+      } else if (this.membershipcard) {
+        this.membership_dis_per =
+          (this.membership_dis_amt / this.Total) * 100;
+        this.discount_amount = this.membership_dis_amt
+      } else {
+        this.membership_dis_per = 0;
+      }
+    }
   },
 
   mounted() {
+    evntBus.$on(
+      "set_membership_card_discount",
+      (available_dis_amt, data) => {
+        if (data.customer == this.customer) {
+          this.check_and_set_membership_offers(data)
+          this.membershipcard = data.name;
+          // if (this.subtotal >= available_dis_amt) {
+          //   this.membership_dis_amt = available_dis_amt;
+          // } else {
+          //   this.membership_dis_amt = this.subtotal;
+          // }
+        } else {
+          evntBus.$emit("show_mesage", {
+            text: __(
+              "Membership card customer is not matched with selected customer."
+            ),
+            color: "error",
+          });
+        }
+      }
+    );
     evntBus.$on("register_pos_profile", (data) => {
       this.pos_profile = data.pos_profile;
       this.customer = data.pos_profile.customer;
-      this.custom_membership_card=data.membershipcard
+      this.custom_membership_card = data.membershipcard;
       this.pos_opening_shift = data.pos_opening_shift;
       this.stock_settings = data.stock_settings;
       this.float_precision =
@@ -2917,7 +3039,7 @@ export default {
     evntBus.$on("update_customer", (customer) => {
       this.customer = customer;
     });
-     evntBus.$on("update_membershipcard", (membershipcard) => {
+    evntBus.$on("update_membershipcard", (membershipcard) => {
       this.membershipcard = membershipcard;
     });
     evntBus.$on("fetch_customer_details", () => {
@@ -3002,7 +3124,6 @@ export default {
     },
     membershipcard() {
       evntBus.$emit("set_membershipcard", this.membershipcard);
-      
     },
     customer_info() {
       evntBus.$emit("set_customer_info_to_edit", this.customer_info);
@@ -3038,6 +3159,9 @@ export default {
         this.additional_discount_percentage = 0;
       }
     },
+    membership_dis_amt() {
+      this.updated_membership_dis_amt()
+    }
   },
 };
 </script>
@@ -3050,4 +3174,3 @@ export default {
   pointer-events: none;
 }
 </style>
-

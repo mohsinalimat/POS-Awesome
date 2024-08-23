@@ -708,7 +708,7 @@ export default {
     loading: false,
     pos_profile: "",
     invoice_doc: "",
-    loyalty_amount: -0,
+    loyalty_amount: 0,
     is_credit_sale: 0,
     is_write_off_change: 0,
     date_menu: false,
@@ -736,6 +736,10 @@ export default {
       evntBus.$emit("set_customer_readonly", false);
     },
     submit(event, payment_received = false, print = false) {
+      if (this.loyalty_amount) {
+        this.invoice_doc.redeem_loyalty_points = 1;
+        this.invoice_doc.dont_create_loyalty_points = 1;
+      }
       if (!this.invoice_doc.is_return && this.total_payments < 0) {
         evntBus.$emit("show_mesage", {
           text: `Payments not correct`,
@@ -804,7 +808,6 @@ export default {
         frappe.utils.play_sound("error");
         return;
       }
-
       let total_change = this.flt(
         this.flt(this.paid_change) + this.flt(-this.credit_change)
       );
@@ -1461,3 +1464,4 @@ export default {
   },
 };
 </script>
+

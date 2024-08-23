@@ -155,6 +155,16 @@
             >{{ couponsCount }} {{ __("Coupons") }}</v-btn
           >
         </v-col>
+        <v-col cols="4" class="mt-2">
+          <v-btn
+            small
+            block
+            color="primary"
+            text
+            @click="show_membership_card"
+            >{{ __("Membership") }}</v-btn
+          >
+        </v-col>
         <v-col cols="5" class="mt-2">
           <v-btn small block color="primary" text @click="show_offers"
             >{{ offersCount }} {{ __("Offers") }} : {{ appliedOffersCount }}
@@ -215,6 +225,9 @@ export default {
     },
     show_coupons() {
       evntBus.$emit("show_coupons", "true");
+    },
+    show_membership_card() {
+      evntBus.$emit("show_membership_card", "true", this.customer);
     },
     get_items() {
       if (!this.pos_profile) {

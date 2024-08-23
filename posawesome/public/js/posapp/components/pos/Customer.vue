@@ -102,7 +102,7 @@
           ></v-list-item-subtitle>
           <v-list-item-subtitle
             v-if="data.item.max_use"
-            v-html="` Max Use : ${data.item.max_use}`"
+            v-html="` Max Use : ${data.item.max_use} | Used : ${data.item.used}`"
           ></v-list-item-subtitle>
         </v-list-item-content>
       </template>
@@ -162,21 +162,21 @@ export default {
     },
     get_membership_card_names() {
       const vm = this;
-      if (this.membershipcards.length > 0) {
-        return;
-      }
-      if (vm.pos_profile.posa_local_storage && localStorage.membership_storage) {
-        vm.membershipcards = JSON.parse(localStorage.getItem('membership_storage'));
+      if(this.customer == ""){
+        if (vm.pos_profile.posa_local_storage && localStorage.membership_storage) {
+          vm.membershipcards = JSON.parse(localStorage.getItem('membership_storage'));
+        }
       }
       frappe.call({
         method: 'posawesome.posawesome.api.posapp.get_membership_card_names',
         args: {
-          pos_profile: this.pos_profile.pos_profile,
+          pos_profile: vm.pos_profile.pos_profile,
+          customer: vm.customer
         },
         callback: function (r) {
           if (r.message) {
             vm.membershipcards = r.message;
-            if (vm.pos_profile.posa_local_storage) {
+            if (vm.pos_profile.posa_local_storage && this.customer == "") {
               localStorage.setItem('membership_storage', JSON.stringify(r.message));
             }
           }
@@ -265,6 +265,7 @@ export default {
   watch: {
     customer() {
       evntBus.$emit('update_customer', this.customer);
+      this.get_membership_card_names()
     },
      membershipcard() {
       evntBus.$emit('update_membershipcard', this.membershipcard);

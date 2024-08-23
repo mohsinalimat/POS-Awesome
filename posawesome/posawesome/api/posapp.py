@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import json
 import frappe
 from datetime import datetime
-from frappe.utils import nowdate, flt, cstr, getdate
+from frappe.utils import nowdate, flt, cstr, getdate, get_link_to_form
 from frappe import _
 from erpnext.accounts.doctype.sales_invoice.sales_invoice import get_bank_cash_account
 from erpnext.stock.get_item_details import get_item_details
@@ -465,7 +465,7 @@ def get_customer_names_list(pos_profile=None):
 
 
 @frappe.whitelist()
-def get_membership_card_names(pos_profile):
+def get_membership_card_names(pos_profile, customer = None):
     _pos_profile = json.loads(pos_profile)
 
     ttl = _pos_profile.get("posa_server_cache_duration")
@@ -479,12 +479,15 @@ def get_membership_card_names(pos_profile):
     def _get_membership_card_names(pos_profile):
         pos_profile = json.loads(pos_profile)
         condition = ""
+        if customer:
+            condition = "WHERE customer = '{0}'".format(customer)
         
         # Add any conditions specific to membership cards
         membershipcard = frappe.db.sql(
             """
-            SELECT name,company
+            SELECT name, company, valid_from, valid_upto, customer, description, max_use, used
             FROM `tabMemberShip Card`
+            {0}
             ORDER BY name
             """.format(
                 condition
@@ -1093,7 +1096,7 @@ def get_item_price_list():
         
 
 @frappe.whitelist()
-def create_membership_card(valid_from, valid_upto, pos_profile_doc, description,customer, method="create"):
+def create_membership_card(valid_from, valid_upto, pos_profile_doc, description, customer, membership_offer, discount_amount = None, method="create"):
     pos_profile = json.loads(pos_profile_doc)
     
     # No need to convert date format if it's already in 'YYYY-MM-DD'
@@ -1101,6 +1104,8 @@ def create_membership_card(valid_from, valid_upto, pos_profile_doc, description,
     # valid_upto = datetime.strptime(valid_upto, '%d-%m-%Y').strftime('%Y-%m-%d')
 
     if method == "create":
+        if frappe.db.exists("MemberShip Card", {"customer": customer, "valid_upto": ["between", (valid_from, valid_upto)] }):
+            frappe.throw("For this customer Membership card already exists...")
         membership_card = frappe.get_doc(
             {
                 "doctype": "MemberShip Card",
@@ -1108,12 +1113,13 @@ def create_membership_card(valid_from, valid_upto, pos_profile_doc, description,
                 "valid_upto": valid_upto,
                 "customer": customer,
                 "description":description,
+                # "discount_amount": discount_amount,
+                "membership_offer": membership_offer
             }
         )
         membership_card.save()
         return membership_card
-
-
+    
 @frappe.whitelist()
 def create_customer(
     customer_id,
@@ -1896,3 +1902,131 @@ def get_sales_invoice_child_table(sales_invoice, sales_invoice_item):
     )
     return child_doc
 
+
+@frappe.whitelist()
+def get_member_details(membership):
+
+    if frappe.db.exists("MemberShip Card", membership):
+        
+        details = frappe.get_doc("MemberShip Card", membership)
+        
+        return details
+    
+    else:
+        return False
+    
+
+@frappe.whitelist()
+def get_member_list_details(customer = None):
+    if customer:
+        member_list = frappe.get_all("MemberShip Card", {"customer": customer}, ["name", "discount_amount", "valid_upto"])   
+        return member_list
+    
+
+@frappe.whitelist()   
+def check_and_set_membership_offers(items, data, customer, posting_date, total):
+    data = json.loads(data)
+    items = json.loads(items)
+    if customer == data['customer'] and data['valid_from'] <= posting_date <= data['valid_upto']:
+        if not data.get('membership_offer'):
+            frappe.throw("Membership Offer not fount in the membership card {0}.".format(get_link_to_form("MemberShip Card", data['name'])))
+        if data.get('max_use') == 0:
+            frappe.throw("The membership card {0} has reached its maximum usage limit.".format(get_link_to_form("MemberShip Card", data['name'])))
+        if not data['membership_offer']:
+            frappe.throw("Offer not fount on Membership card.")
+        discount = get_membership_offers(items, data['membership_offer'])
+        if not discount:
+            frappe.throw("Offer not fount based on selected Items.")
+        # available_dis_amt = data.get('max_discount_amount') - data.get('used_discount_amount')
+        per_amt = 0
+
+        if discount[0]:
+            per_amt = (float(total) * float(discount[0])) / 100
+        total_discount_amt = per_amt + discount[1]
+        final_discount_amt = 0
+
+        # if total_discount_amt > available_dis_amt:
+        #     final_discount_amt = total_discount_amt - (total_discount_amt - available_dis_amt)
+        #     frappe.msgprint(_("Membership offer available amount is {0}.".format(final_discount_amt)), alert=True)
+        # else:
+        #     final_discount_amt = total_discount_amt
+        final_discount_amt = total_discount_amt
+
+        if final_discount_amt > data["max_discount_amount"]:
+        #    frappe.throw("The Discount amount is greater then Max Discount.")
+            final_discount_amt = data["max_discount_amount"]
+
+        # if data["max_discount_amount"] < data.get('used_discount_amount'):
+        #     frappe.throw(f"The membership card has reached its discount amount limit. This is {data['discount_amount']} amount.")
+
+        return final_discount_amt
+        
+    else:
+        frappe.throw("Kindly Check Customer's Valid Date of Membership Card {0}.".format(get_link_to_form("MemberShip Card", data['name'])))
+
+
+def get_membership_offers(items, ms_offer_name):
+    ms_offer = frappe.get_doc("Membership Offer", ms_offer_name)
+    apply_filename = None
+    item_filename = None
+    discount_amt = 0
+    discount_per = 0
+    total = 0
+    total_qty = 0
+
+    if ms_offer.apply_on == "Item Code":
+        apply_filename = "item"
+        item_filename = "item_code"
+    elif ms_offer.apply_on == "Item Group":
+        item_filename = apply_filename = "item_group"
+    elif ms_offer.apply_on == "Brand":
+        item_filename = apply_filename = "brand"
+    elif ms_offer.apply_on == "Transaction":
+        pass
+    else:
+        frappe.throw("Apply On is missing. In membership Offer {0}.".format(get_link_to_form("Membership Offer", ms_offer.name)))
+
+    for item in items:
+        if item.get(item_filename) == ms_offer.get(apply_filename):
+            total += item.get('rate') * item.get('qty')
+            total_qty += item.get('qty')
+            if ms_offer.discount_type == "Discount Percentage":
+                discount_per = ms_offer.discount_percentage
+            elif ms_offer.discount_type == "Discount Amount":
+                discount_amt = ms_offer.discount_amount
+    
+    if not check_conditions(total, total_qty, ms_offer.get('min_amt'), ms_offer.get('max_amt'), ms_offer.get('min_qty'), ms_offer.get('max_qty')):
+        frappe.throw(_("Min and Max condition not Match."))
+        return
+    
+    if ms_offer.apply_on == "Transaction":
+        for item in items:
+            total += item.get('rate') * item.get('qty')
+            total_qty += item.get('qty')
+        if ms_offer.discount_type == "Discount Percentage":
+            discount_per = ms_offer.discount_percentage
+        elif ms_offer.discount_type == "Discount Amount":
+            discount_amt = ms_offer.discount_amount
+
+    return discount_per, discount_amt
+
+def check_conditions(amt, qty, min_amt, max_amt, min_qty, max_qty):
+    amt_condition = True
+    qty_condition = True
+    
+    if min_amt > 0:
+        amt_condition = amt_condition and amt >= min_amt
+    if max_amt > 0:
+        amt_condition = amt_condition and amt <= max_amt
+    
+    if min_qty > 0:
+        qty_condition = qty_condition and qty >= min_qty
+    if max_qty > 0:
+        qty_condition = qty_condition and qty <= max_qty
+    
+    if min_qty == 0 and max_qty == 0:
+        return amt_condition 
+    elif min_amt == 0 and max_amt == 0:
+        return qty_condition 
+    else:
+        return amt_condition and qty_condition 
