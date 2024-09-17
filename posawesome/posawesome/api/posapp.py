@@ -1953,8 +1953,7 @@ def check_and_set_membership_offers(items, data, customer, posting_date, total):
         final_discount_amt = total_discount_amt
 
         if final_discount_amt > data["max_discount_amount"]:
-        #    frappe.throw("The Discount amount is greater then Max Discount.")
-            final_discount_amt = data["max_discount_amount"]
+            frappe.throw("The Discount amount is greater then Max Discount.")
 
         # if data["max_discount_amount"] < data.get('used_discount_amount'):
         #     frappe.throw(f"The membership card has reached its discount amount limit. This is {data['discount_amount']} amount.")
@@ -1988,8 +1987,8 @@ def get_membership_offers(items, ms_offer_name):
 
     for item in items:
         if item.get(item_filename) == ms_offer.get(apply_filename):
-            total += item.get('rate') * item.get('qty')
-            total_qty += item.get('qty')
+            total += int(item.get('rate')) * float(item.get('qty'))
+            total_qty += float(item.get('qty'))
             if ms_offer.discount_type == "Discount Percentage":
                 discount_per = ms_offer.discount_percentage
             elif ms_offer.discount_type == "Discount Amount":
@@ -2001,8 +2000,8 @@ def get_membership_offers(items, ms_offer_name):
     
     if ms_offer.apply_on == "Transaction":
         for item in items:
-            total += item.get('rate') * item.get('qty')
-            total_qty += item.get('qty')
+            total += int(item.get('rate')) * float(item.get('qty'))
+            total_qty += float(item.get('qty'))
         if ms_offer.discount_type == "Discount Percentage":
             discount_per = ms_offer.discount_percentage
         elif ms_offer.discount_type == "Discount Amount":
